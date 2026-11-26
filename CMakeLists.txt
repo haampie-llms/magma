@@ -334,6 +334,28 @@ if (MAGMA_ENABLE_HIP)
 
         #add_compile_options(${GPU_ARCH_FLAGS})
         set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__HIP_PLATFORM_AMD__ -DHIPBLAS_V2" )
+
+        # With hipcc (or another Clang based HIP compiler) as C++ compiler,
+        # HIP sources are compiled as C++, and hip::device compiles every C++
+        # source as HIP. With any other C++ compiler, compile HIP sources with
+        # the HIP language for the gfx targets in GPU_TARGET.
+        if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            set( MAGMA_HIP_TARGET hip::device )
+        else()
+            if (CMAKE_VERSION VERSION_LESS 3.21)
+                message( FATAL_ERROR "The HIP language requires CMake 3.21 or newer" )
+            endif()
+            if (NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+                string( REGEX MATCHALL "gfx[0-9a-f]+" CMAKE_HIP_ARCHITECTURES "${GPU_TARGET}" )
+            endif()
+            enable_language( HIP )
+            set( MAGMA_HIP_TARGET hip::host )
+            set( CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} ${FORTRAN_CONVENTION} -DHIPBLAS_V2" )
+            # The HIP compiler links and does not get the OpenMP flag of the C++
+            # compiler.
+            link_libraries( ${OpenMP_CXX_LIBRARIES} )
+            message( STATUS "CMAKE_HIP_ARCHITECTURES: ${CMAKE_HIP_ARCHITECTURES}" )
+        endif()
     else()
         message( STATUS "Could not find HIP" )
     endif()
@@ -404,6 +426,13 @@ if (MAGMA_ENABLE_CUDA)
   include( ${CMAKE_SOURCE_DIR}/CMake.src.cuda )
 else()
   include( ${CMAKE_SOURCE_DIR}/CMake.src.hip )
+  if (CMAKE_HIP_COMPILER_LOADED)
+    foreach( filename ${libmagma_all} ${libtest_all} ${testing_all} ${libsparse_all} ${sparse_testing_all} )
+      if (filename MATCHES "\\.hip\\.cpp$")
+        set_source_files_properties( ${filename} PROPERTIES LANGUAGE HIP )
+      endif()
+    endforeach()
+  endif()
 endif()
 
 # ----------------------------------------
@@ -512,7 +541,7 @@ else()
         target_link_libraries( magma
             hip::host
             ${LAPACK_LIBRARIES}
-            hip::device
+            ${MAGMA_HIP_TARGET}
             roc::hipblas
             roc::hipsparse
         )
@@ -596,7 +625,7 @@ else()
     target_link_libraries( magma_sparse
         magma
         ${LAPACK_LIBRARIES}
-        hip::device
+        ${MAGMA_HIP_TARGET}
         roc::hipblas
         roc::hipsparse
     )
