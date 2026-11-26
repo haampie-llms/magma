@@ -58,9 +58,14 @@ MAGMA README FILE
 
     Options include:
         -DMAGMA_ENABLE_CUDA=ON to install MAGMA for CUDA. This is default.
-        -DMAGMA_ENABLE_HIP=ON to install MAGMA for HIP. This option requires
-            to specify the hipcc compiler, e.g.,
+        -DMAGMA_ENABLE_HIP=ON to install MAGMA for HIP. Either specify the
+            hipcc compiler as C++ compiler, e.g.,
             cmake -DMAGMA_ENABLE_HIP=ON -DCMAKE_CXX_COMPILER=hipcc ..
+            or use a C++ compiler that is not Clang based, in which case the
+            HIP sources are compiled with the CMake HIP language (requires
+            CMake 3.21), e.g.,
+            cmake -DMAGMA_ENABLE_HIP=ON -DCMAKE_CXX_COMPILER=g++ \
+                  -DGPU_TARGET=gfx90a ..
 
         -DCMAKE_INSTALL_PREFIX=/path/to/magma, directory to install MAGMA's
             headers and libraries, default /usr/local/magma.
